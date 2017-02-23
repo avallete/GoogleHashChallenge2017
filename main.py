@@ -1,5 +1,7 @@
 import sys
 
+CACHES_SIZE = 0
+VIDEOS_SIZES = []
 
 def get_input(fd):
     lines = []
@@ -25,6 +27,21 @@ def caches_from_endpoints(endpoints):
                 endpoint['data_center_latency'] - cache_latency)
     return caches
 
+def compute_video_score(cache_score_dict):
+    sum_score = 0
+    for score in cache_score_dict.values():
+        sum_score += score
+    return sum_score
+
+def get_video_max_id_from_cache(cache):
+    current_id = 0
+    current_max_score = 0
+    for video_id, cache_dict in cache['video_requests'].items():
+        video_score = compute_video_score(cache_dict)
+        if video_score > current_max_score:
+            current_id = video_id
+            current_max_score = video_score
+    return current_id
 
 
 def parse_endpoint(latency, caches_numbers, input):
@@ -55,11 +72,12 @@ def app_run():
     input = get_input(fd)
 
     videos_nb, endpoint_nb, request_nb, caches_nb, caches_size = input.pop(0).split(' ')
-    videos_sizes = input.pop(0).split(' ')
+    CACHES_SIZE = int(caches_size)
+    for size in input.pop(0).split(' '):
+        VIDEOS_SIZES.append(int(size))
     endpoints = parse_endpoints_and_requests(input, int(endpoint_nb), int(request_nb))
 
     caches = caches_from_endpoints(endpoints)
-
     fd.close()
 
 
