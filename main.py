@@ -26,6 +26,14 @@ def caches_from_endpoints(endpoints):
     return caches
 
 
+def best_cache_for_vid(caches, video_id):
+    max = (0, 0)
+    for cache in caches:
+        if cache['video_requests'][video_id]:
+            score = compute_video_score(cache['video_requests'][video_id])
+            if score > max[1]:
+                max = (caches.index(cache), score)
+    return max[0];
 
 def parse_endpoint(latency, caches_numbers, input):
     endpoint = {'caches': [], 'videos': [], 'data_center_latency': latency}
@@ -49,6 +57,13 @@ def parse_endpoints_and_requests(input, endpoint_nb, request_nb):
         endpoints[int(endpoint_id)]['videos'].append((int(video_id), int(requests)))
     return endpoints
 
+def cache_video(caches, cache_id, video_id):
+    del caches[cache_id]['video_requests'][video_id]
+    if caches[cache_id]['used_size'] + VIDEO_SIZES[video_id] > CACHES_SIZE:
+        return
+    caches[cache_id]['cached_videos'].append(video_id)
+    caches[cache_id]['used_size'] += VIDEO_SIZES[video_id]
+    # reduce score on other caches
 
 def app_run():
     fd = open(sys.argv[1], "r")
