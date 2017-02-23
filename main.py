@@ -1,7 +1,7 @@
 import sys
 
 CACHES_SIZE = 0
-VIDEOS_SIZES = []
+VIDEO_SIZES = []
 
 def get_input(fd):
     lines = []
@@ -19,7 +19,7 @@ def caches_from_endpoints(endpoints):
     for endpoint in endpoints:
         for (cache_id, cache_latency) in endpoint['caches']:
             if not cache_id in caches:
-                caches[cache_id] = {'video_requests': {}}
+                caches[cache_id] = {'video_requests': {}, 'used_size': 0, 'cached_videos': []}
             for (video_id, video_requests) in endpoint['videos']:
                 if not video_id in caches[cache_id]['video_requests']:
                     caches[cache_id]['video_requests'][video_id] = {}
@@ -45,12 +45,12 @@ def get_video_max_id_from_cache(cache):
 
 def best_cache_for_vid(caches, video_id):
     max = (0, 0)
-    for cache in caches:
-        if cache['video_requests'][video_id]:
+    for c_id, cache in caches.items():
+        if video_id in cache['video_requests'].keys():
             score = compute_video_score(cache['video_requests'][video_id])
             if score > max[1]:
-                max = (caches.index(cache), score)
-    return max[0];
+                max = (c_id, score)
+    return max[0]
 
 def parse_endpoint(latency, caches_numbers, input):
     endpoint = {'caches': [], 'videos': [], 'data_center_latency': latency}
@@ -58,7 +58,6 @@ def parse_endpoint(latency, caches_numbers, input):
         cache_id, cache_latency = input.pop(0).split(' ')
         endpoint['caches'].append((int(cache_id), int(cache_latency)))
     return endpoint
-
 
 def parse_endpoints_and_requests(input, endpoint_nb, request_nb):
     endpoints = []
@@ -74,17 +73,26 @@ def parse_endpoints_and_requests(input, endpoint_nb, request_nb):
         endpoints[int(endpoint_id)]['videos'].append((int(video_id), int(requests)))
     return endpoints
 
-def cache_video(caches, cache_id, video_id):
+def cache_video(caches, cache_id, video_id, caches_size):
     endpoints = caches[cache_id]['video_requests'][video_id]
     del caches[cache_id]['video_requests'][video_id]
-    if caches[cache_id]['used_size'] + VIDEO_SIZES[video_id] > CACHES_SIZE:
+    if caches[cache_id]['used_size'] + VIDEO_SIZES[video_id] > caches_size:
         return
-    caches[cache_id]['cached_videos'].append(video_id)
+    caches[cache_id]['cached_videos'].append(str(video_id))
     caches[cache_id]['used_size'] += VIDEO_SIZES[video_id]
-    for cache in caches:
+    for cache in caches.values():
         for ep in endpoints:
-            if ep in cache['video_requests'][video_id]:
+            if video_id in cache['video_requests'] and ep in cache['video_requests'][video_id]:
                 del cache['video_requests'][video_id][ep]
+                if len(cache['video_requests'][video_id]) == 0:
+                    del cache['video_requests'][video_id]
+        # import ipdb; ipdb.set_trace()
+
+def print_result(caches):
+    print (len(caches))
+    for cache_id, data in caches.items():
+        print "%s %s" % (cache_id, " ".join(data['cached_videos']))
+
 
 def app_run():
     fd = open(sys.argv[1], "r")
@@ -93,10 +101,16 @@ def app_run():
     videos_nb, endpoint_nb, request_nb, caches_nb, caches_size = input.pop(0).split(' ')
     CACHES_SIZE = int(caches_size)
     for size in input.pop(0).split(' '):
-        VIDEOS_SIZES.append(int(size))
+        VIDEO_SIZES.append(int(size))
     endpoints = parse_endpoints_and_requests(input, int(endpoint_nb), int(request_nb))
-
     caches = caches_from_endpoints(endpoints)
+
+    for c_id, cache in caches.items():
+        while len(cache['video_requests']) > 0:
+            video_id = get_video_max_id_from_cache(cache)
+            cache_id = best_cache_for_vid(caches, video_id)
+            cache_video(caches, cache_id, video_id, int(caches_size))
+    print_result(caches)
     fd.close()
 
 
