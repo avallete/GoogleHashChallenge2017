@@ -75,12 +75,16 @@ def parse_endpoints_and_requests(input, endpoint_nb, request_nb):
     return endpoints
 
 def cache_video(caches, cache_id, video_id):
+    endpoints = caches[cache_id]['video_requests'][video_id]
     del caches[cache_id]['video_requests'][video_id]
     if caches[cache_id]['used_size'] + VIDEO_SIZES[video_id] > CACHES_SIZE:
         return
     caches[cache_id]['cached_videos'].append(video_id)
     caches[cache_id]['used_size'] += VIDEO_SIZES[video_id]
-    # reduce score on other caches
+    for cache in caches:
+        for ep in endpoints:
+            if ep in cache['video_requests'][video_id]:
+                del cache['video_requests'][video_id][ep]
 
 def app_run():
     fd = open(sys.argv[1], "r")
